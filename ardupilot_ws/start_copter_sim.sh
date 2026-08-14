@@ -1,5 +1,9 @@
 # This script is going gto be used to start the simulation environment for the ArduPilot ROS2 development workspace. It sets up the necessary environment variables and sources the required scripts for proper functionality.
-set -e
+set -ex
+
+# Kill all SITL binaries when exiting
+trap "killall -9 arducopter" SIGINT SIGTERM EXIT
+
 export GZ_VERSION=harmonic
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,5 +33,10 @@ fi
 
 export GZ_SIM_SYSTEM_PLUGIN_PATH=${SCRIPT_DIR}/gz_ws/src/ardupilot_gazebo/build:$GZ_SIM_SYSTEM_PLUGIN_PATH
 export GZ_SIM_RESOURCE_PATH=${SCRIPT_DIR}/gz_ws/src/ardupilot_gazebo/models:${SCRIPT_DIR}/gz_ws/src/ardupilot_gazebo/worlds:$GZ_SIM_RESOURCE_PATH
+
+#
+COPTER=${SCRIPT_DIR}/ardupilot/build/sitl/bin/arducopter
+
+${COPTER} -S --model JSON --uartA mcast: &
 
 gz sim -v4 -r iris_runway.sdf

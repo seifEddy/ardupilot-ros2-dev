@@ -10,3 +10,7 @@ __pycache__/
 
 # Ignore all hidden config files and directories
 .vscode/
+
+# Ignore mavproxy logs
+mavproxy.log
+mav.*
