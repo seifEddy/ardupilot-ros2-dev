@@ -34,9 +34,22 @@ fi
 export GZ_SIM_SYSTEM_PLUGIN_PATH=${SCRIPT_DIR}/gz_ws/src/ardupilot_gazebo/build:$GZ_SIM_SYSTEM_PLUGIN_PATH
 export GZ_SIM_RESOURCE_PATH=${SCRIPT_DIR}/gz_ws/src/ardupilot_gazebo/models:${SCRIPT_DIR}/gz_ws/src/ardupilot_gazebo/worlds:$GZ_SIM_RESOURCE_PATH
 
-#
-COPTER=${SCRIPT_DIR}/ardupilot/build/sitl/bin/arducopter
 
-${COPTER} -S --model JSON --uartA mcast: &
+COPTER="${SCRIPT_DIR}/ardupilot/build/sitl/bin/arducopter"
+SITL_DIR="${SCRIPT_DIR}/copter_files"
 
-gz sim -v4 -r iris_runway.sdf
+mkdir -p "${SITL_DIR}/scripts"
+
+(
+    cd "${SITL_DIR}"
+    exec "${COPTER}" -S --model JSON \
+      --uartA mcast: \
+      --serial2=udpclient:127.0.0.1:14560
+) &
+
+# get parameters for whether we use gz gui or not
+if [ "$1" = "gui" ]; then
+    gz sim -v4 -r iris_runway.sdf
+else
+    gz sim -v4 -r iris_runway.sdf -s
+fi

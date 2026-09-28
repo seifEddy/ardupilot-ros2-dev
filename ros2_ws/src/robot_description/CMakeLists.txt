@@ -29,6 +29,9 @@ ament_target_dependencies(robot_controller_node
 install(TARGETS robot_controller_node
   DESTINATION lib/${PROJECT_NAME})
 
+install(PROGRAMS scripts/request_streams.py
+  DESTINATION lib/${PROJECT_NAME})
+
 install(DIRECTORY launch urdf config
   DESTINATION share/${PROJECT_NAME})
 

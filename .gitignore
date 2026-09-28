@@ -14,3 +14,10 @@ __pycache__/
 # Ignore mavproxy logs
 mavproxy.log
 mav.*
+
+# Ignore copter files keep only scripts
+ardupilot_ws/copter_files/logs/
+ardupilot_ws/copter_files/terrain/
+ardupilot_ws/copter_files/*.bin
+
+

@@ -1,0 +1,4 @@
+# Applied to all nodes in the MAVROS process, including plugin nodes.
+/**:
+  ros__parameters:
+    use_sim_time: $(var use_sim_time)
