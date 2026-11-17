@@ -7,6 +7,7 @@ From the repository root, run:
 ```bash
 ./ardupilot_ws/start_copter_sim.sh                # Quad X with headless rendering
 ./ardupilot_ws/start_copter_sim.sh gui            # Quad X with the Gazebo GUI
+./ardupilot_ws/start_copter_sim.sh gui quad_x_tether # Quad X with the ground winch
 ./ardupilot_ws/start_copter_sim.sh gui iris       # Original Iris runway
 ```
 
@@ -17,6 +18,10 @@ bash ./ardupilot_ws/start_mavproxy.sh
 ```
 
 For simulation with MAVROS and the ROS 2 sensor bridge, use [the combined ROS 2 launch](../ros2_ws/README.md#run-the-combined-simulation). That launch starts this script and owns its lifetime. The script also works directly for a Gazebo and MAVProxy workflow. Simulator parameters, logs, and Lua scripts use `copter_files/` by default. Set `SITL_DIR` to an alternate absolute directory to run with separate simulator state.
+
+## Tethered Quad X
+
+The tether world adds an anchored station, driven drum and compliant line to the Quad X test field. The starting payout is set in the world file. The drum automatically pays out against a brake when the cable pulls above its breakaway threshold. See the [tether model and measurements](gz_ws/src/ardupilot_gazebo/docs/quad_x_tether.md) for the joint layout, force law, and winch commands.
 
 ## Circle flight demo
 

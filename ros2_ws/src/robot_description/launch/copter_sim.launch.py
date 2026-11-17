@@ -55,7 +55,7 @@ def generate_launch_description():
     package_share = Path(get_package_share_directory("robot_description"))
     return LaunchDescription([
         DeclareLaunchArgument("mode", default_value="headless", choices=["headless", "gui"]),
-        DeclareLaunchArgument("world", default_value="quad_x", choices=["quad_x", "iris"]),
+        DeclareLaunchArgument("world", default_value="quad_x", choices=["quad_x", "quad_x_tether", "iris"]),
         DeclareLaunchArgument("fcu_url", default_value="udp://127.0.0.1:14560@"),
         DeclareLaunchArgument(
             "sitl_script", default_value=default_script(package_share),

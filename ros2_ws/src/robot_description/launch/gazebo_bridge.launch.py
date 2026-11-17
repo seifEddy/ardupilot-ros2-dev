@@ -7,8 +7,14 @@ from launch_ros.actions import Node
 
 
 def configure_bridge(context):
-    quad_x = LaunchConfiguration("world").perform(context) == "quad_x"
-    world = "/world/quad_x_test_field" if quad_x else "/world/iris_runway"
+    selected_world = LaunchConfiguration("world").perform(context)
+    tethered = selected_world == "quad_x_tether"
+    quad_x = selected_world != "iris"
+    world = "/world/" + {
+        "quad_x": "quad_x_test_field",
+        "quad_x_tether": "quad_x_tether_field",
+        "iris": "iris_runway",
+    }[selected_world]
     vehicle = f"{world}/model/{'quad_x_with_gimbal' if quad_x else 'iris_with_gimbal'}"
     airframe = f"{vehicle}/model/{'quad_x' if quad_x else 'iris_with_standoffs'}"
     camera = f"{vehicle}/model/gimbal/link/pitch_link/sensor/camera"
@@ -43,12 +49,26 @@ def configure_bridge(context):
             "/gz/world/reference_navsat", "sensor_msgs/msg/NavSatFix", "NavSat",
         ))
 
+    if tethered:
+        for name in (
+            "length", "range", "extension", "payout_rate", "tension",
+            "azimuth", "elevation", "drum_load_torque",
+        ):
+            mappings.append((f"/tether/{name}", f"/gz/tether/{name}", "std_msgs/msg/Float64", "Double"))
+        mappings.append(("/tether/anchor_force", "/gz/tether/anchor_force", "geometry_msgs/msg/Vector3", "Vector3d"))
+
+    arguments = [f"{topic}@{ros_type}[gz.msgs.{gz_type}" for topic, _, ros_type, gz_type in mappings]
+    remappings = [(topic, ros_topic) for topic, ros_topic, _, _ in mappings]
+    if tethered:
+        arguments.append("/tether/cmd_length@std_msgs/msg/Float64]gz.msgs.Double")
+        remappings.append(("/tether/cmd_length", "/gz/tether/cmd_length"))
+
     return [Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
         name="gazebo_telemetry_bridge",
-        arguments=[f"{topic}@{ros_type}[gz.msgs.{gz_type}" for topic, _, ros_type, gz_type in mappings],
-        remappings=[(topic, ros_topic) for topic, ros_topic, _, _ in mappings],
+        arguments=arguments,
+        remappings=remappings,
         output="screen",
     )]
 
@@ -56,7 +76,7 @@ def configure_bridge(context):
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
-            "world", default_value="quad_x", choices=["quad_x", "iris"],
+            "world", default_value="quad_x", choices=["quad_x", "quad_x_tether", "iris"],
             description="The world selected in start_copter_sim.sh",
         ),
         OpaqueFunction(function=configure_bridge),

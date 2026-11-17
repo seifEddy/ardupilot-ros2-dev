@@ -23,7 +23,7 @@ If building the differential-drive example, also install its controller dependen
 ros2 launch robot_description copter_sim.launch.py mode:=gui
 ```
 
-The default is `mode:=headless world:=quad_x`. Set `world:=iris` for the original Iris runway. If the ROS install is outside the checkout, pass `sitl_script:=/absolute/path/to/ardupilot_ws/start_copter_sim.sh`. Run a single stack per SITL endpoint.
+The default is `mode:=headless world:=quad_x`. Set `world:=quad_x_tether` for the tether station or `world:=iris` for the original Iris runway. If the ROS install is outside the checkout, pass `sitl_script:=/absolute/path/to/ardupilot_ws/start_copter_sim.sh`. Run a single stack per SITL endpoint.
 
 The launcher starts the existing shell script as a managed process and includes both ROS launch files. The Gazebo bridge publishes the world clock once on ROS `/clock`. MAVROS and its telemetry requester use simulation time. The requester waits for a connected FCU and retries stream requests using the ROS clock. It reapplies them after a reconnect and waits for the clock when Gazebo is paused or reset.
 
@@ -46,6 +46,7 @@ Use the same `world` profile and `GZ_PARTITION` as the running Gazebo instance. 
 
 - Both worlds expose poses, dynamic poses, joint states, IMU, the front RGB image and camera calibration, gimbal command telemetry, and Gazebo resource paths.
 - Quad X also exposes `/gz/navsat`, `/gz/air_pressure`, `/gz/magnetometer`, and the rear depth image, calibration, and point cloud under `/gz/camera/rear_depth/`.
+- The tether world also publishes winch and cable measurements under `/gz/tether/` and accepts `/gz/tether/cmd_length` in metres. See the [tether model](../ardupilot_ws/gz_ws/src/ardupilot_gazebo/docs/quad_x_tether.md).
 - The Iris world publishes its reference NavSat under `/gz/world/reference_navsat`.
 
 ROS topic names and message types live in `gazebo_bridge.launch.py`. The installed Harmonic bridge has no conversion for Gazebo's scene, scene-deletion, world-statistics, marker, or serialized-state messages. Command-only Gazebo inputs and Gazebo services are outside this telemetry launch. Use MAVROS for flight-controller commands.
