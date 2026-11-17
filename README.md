@@ -1,43 +1,19 @@
-# ardupilot-ros2-dev
-This repository holds the basic Ardupilot and ROS2 basic project to start with.
+# ArduPilot ROS 2 development workspace
 
-When you clone this repo, rememeber to recursively sync and init the submodules:
+This repository brings ArduCopter SITL, Gazebo Harmonic, and ROS 2 Humble together for development. The Quad X test field is the default simulation. MAVROS provides the MAVLink connection used by both SITL and a physical flight controller. Gazebo sensor data is available separately through `ros_gz_bridge`.
+
+Clone the repository with its submodules.
 
 ```bash
 git clone --recurse-submodules https://github.com/seifEddy/ardupilot-ros2-dev.git
+cd ardupilot-ros2-dev
 ```
 
-## Start Copter simulation (iris_runway)
+- [ArduPilot workspace](ardupilot_ws/README.md) covers standalone simulation, the Gazebo models, MAVProxy, and the circle-flight demo.
+- [ROS 2 workspace](ros2_ws/README.md) covers dependencies, the combined launch, Gazebo topics, and connecting MAVROS to a flight controller.
 
-Assuming that you cloned the repository including all the submodules, all you have to do is:
-
-```bash
-chmod +x ardupilot_ws/start_copter_sim.sh
-./ardupilot_ws/start_copter_sim.sh
-```
-
-This script will: 
-
-- Check if ardupilot firmware was built for `sitl`, if not it will build it.
-- Check if ardupilot Gazebo plugin was built, if not it will build it.
-- Launch copter simulation, and it is ready to interact with using `mavproxy.py`
-
-## ROS2
-
-First, you need to have `ros2` humble installed here -> [ros2 humble installation](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html)
-
-When you have installed `ros2` humble you can build the packages on the `ros2_ws`:
+After building and sourcing the ROS 2 workspace, start the full simulation stack with:
 
 ```bash
-# From inside the cloned repo
-cd ros2_ws
-rosdep install --from-paths src --ignore-src -y
-colcon build
-source install/setup.bash  # Or add it permanently to you ~/.bashrc
-```
-
-After a successful build, you now can launch the `ros2` robot spawner to have it up and running in your already running `gz` instance.
-
-```bash
-ros2 launch robot_description spawn_robot.launch.py
+ros2 launch robot_description copter_sim.launch.py mode:=gui
 ```

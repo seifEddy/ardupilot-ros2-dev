@@ -1,7 +1,7 @@
 """Launch stock MAVROS APM configuration and request telemetry over UDP.
 
 Installed by the robot_description ament_cmake package. Run:
-  ros2 launch robot_description apm_udp.launch.py
+  ros2 launch robot_description sim_apm_udp.launch.py
 """
 
 from pathlib import Path
@@ -20,7 +20,7 @@ def generate_launch_description():
     package_share = Path(get_package_share_directory("robot_description"))
     defaults = {
         "fcu_url": ("udp://127.0.0.1:14560@", "MAVROS UDP listening endpoint"),
-        "namespace": ("mavros", "MAVROS namespace"),
+        "namespace": ("", "Optional prefix for the standard mavros namespace"),
         "tgt_system": ("1", "Vehicle MAVLink system ID"),
         "tgt_component": ("1", "Vehicle MAVLink autopilot component ID"),
         "stream_id": ("0", "MAVLink stream group: 0=all, 6=position, 10=extra1"),
@@ -72,6 +72,8 @@ def generate_launch_description():
         executable="request_streams.py",
         namespace=LaunchConfiguration("namespace"),
         name="stream_setup",
+        # mavros_node creates its UAS under mavros/ within the launch namespace.
+        remappings=[("state", "mavros/state"), ("set_stream_rate", "mavros/set_stream_rate")],
         parameters=[{
             "use_sim_time": sim_time,
             "stream_id": ParameterValue(LaunchConfiguration("stream_id"), value_type=int),
@@ -80,13 +82,4 @@ def generate_launch_description():
         output="screen",
     )
 
-    clock_bridge = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        name="clock_bridge",
-        arguments=[
-            "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
-        ],
-        output="screen",
-    )
     return LaunchDescription([*arguments, mavros, configure_streams, clock_bridge])

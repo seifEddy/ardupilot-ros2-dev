@@ -1,12 +1,30 @@
-# This script is going gto be used to start the simulation environment for the ArduPilot ROS2 development workspace. It sets up the necessary environment variables and sources the required scripts for proper functionality.
-set -ex
+#!/usr/bin/env bash
 
-# Kill all SITL binaries when exiting
-trap "killall -9 arducopter" SIGINT SIGTERM EXIT
+set -e
 
 export GZ_VERSION=harmonic
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+GAZEBO_DIR="${SCRIPT_DIR}/gz_ws/src/ardupilot_gazebo"
+
+case "${1:-headless}" in
+    gui) gazebo_args=() ;;
+    headless) gazebo_args=(-s --headless-rendering) ;;
+    *)
+        printf 'Usage: %s [gui|headless] [quad_x|iris]\n' "$0" >&2
+        exit 2
+        ;;
+esac
+
+case "${2:-quad_x}" in
+    quad_x) world=quad_x.sdf ;;
+    iris) world=iris_runway.sdf ;;
+    *)
+        printf 'Usage: %s [gui|headless] [quad_x|iris]\n' "$0" >&2
+        exit 2
+        ;;
+esac
+
 
 # First we check if we have built the ArduPilot firmware for SITL board. If not, we will build it.
 if [ ! -d "${SCRIPT_DIR}/ardupilot/build" ]; then
@@ -20,9 +38,9 @@ if [ ! -d "${SCRIPT_DIR}/ardupilot/build" ]; then
 fi
 
 # Second, we check if the user has built the ArduPilot Gazebo plugin. If not, we will build it.
-if [ ! -d "${SCRIPT_DIR}/gz_ws/src/ardupilot_gazebo/build" ]; then
+if [ ! -d "${GAZEBO_DIR}/build" ]; then
     echo -e "\033[1;32mArduPilot Gazebo plugin not found. Building it now...\033[0m" 
-    cd "${SCRIPT_DIR}/gz_ws/src/ardupilot_gazebo"
+    cd "${GAZEBO_DIR}"
     mkdir -p build
     cd build
     cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -31,25 +49,48 @@ if [ ! -d "${SCRIPT_DIR}/gz_ws/src/ardupilot_gazebo/build" ]; then
     echo -e "\033[1;32mArduPilot Gazebo plugin built successfully.\033[0m"
 fi
 
-export GZ_SIM_SYSTEM_PLUGIN_PATH=${SCRIPT_DIR}/gz_ws/src/ardupilot_gazebo/build:$GZ_SIM_SYSTEM_PLUGIN_PATH
-export GZ_SIM_RESOURCE_PATH=${SCRIPT_DIR}/gz_ws/src/ardupilot_gazebo/models:${SCRIPT_DIR}/gz_ws/src/ardupilot_gazebo/worlds:$GZ_SIM_RESOURCE_PATH
-
+export GZ_SIM_SYSTEM_PLUGIN_PATH="${GAZEBO_DIR}/build${GZ_SIM_SYSTEM_PLUGIN_PATH:+:${GZ_SIM_SYSTEM_PLUGIN_PATH}}"
+export GZ_SIM_RESOURCE_PATH="${GAZEBO_DIR}/models:${GAZEBO_DIR}/worlds${GZ_SIM_RESOURCE_PATH:+:${GZ_SIM_RESOURCE_PATH}}"
 
 COPTER="${SCRIPT_DIR}/ardupilot/build/sitl/bin/arducopter"
-SITL_DIR="${SCRIPT_DIR}/copter_files"
-
+SITL_DIR="${SITL_DIR:-${SCRIPT_DIR}/copter_files}"
 mkdir -p "${SITL_DIR}/scripts"
+
+# Stop only the processes owned by this launch.
+sitl_pid=
+gazebo_pid=
+cleanup() {
+    local -a targets=()
+    [[ -z "${gazebo_pid}" ]] || targets+=("-${gazebo_pid}")
+    [[ -z "${sitl_pid}" ]] || targets+=("${sitl_pid}")
+    if (( ${#targets[@]} )); then
+        kill -TERM -- "${targets[@]}" 2>/dev/null || true
+        for _ in {1..20}; do
+            local running=false
+            for target in "${targets[@]}"; do
+                if kill -0 -- "${target}" 2>/dev/null; then running=true; fi
+            done
+            if ! "${running}"; then break; fi
+            sleep 0.1
+        done
+        kill -KILL -- "${targets[@]}" 2>/dev/null || true
+        wait 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 (
     cd "${SITL_DIR}"
     exec "${COPTER}" -S --model JSON \
+      --home=-35.363262,149.165237,584,90 \
+      --defaults "${GAZEBO_DIR}/config/gazebo-iris-gimbal.parm" \
       --uartA mcast: \
       --serial2=udpclient:127.0.0.1:14560
 ) &
+sitl_pid=$!
 
-# get parameters for whether we use gz gui or not
-if [ "$1" = "gui" ]; then
-    gz sim -v4 -r iris_runway.sdf
-else
-    gz sim -v4 -r iris_runway.sdf -s
-fi
+setsid gz sim -v4 -r "${GAZEBO_DIR}/worlds/${world}" "${gazebo_args[@]}" &
+gazebo_pid=$!
+wait -n "${sitl_pid}" "${gazebo_pid}"
