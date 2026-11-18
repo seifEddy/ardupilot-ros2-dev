@@ -8,6 +8,7 @@ endif()
 # ── dependencies ──────────────────────────────────────────────────────────────
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp      REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs   REQUIRED)
 
@@ -37,5 +38,24 @@ install(DIRECTORY launch urdf config
 
 install(DIRECTORY include/
   DESTINATION include)
+
+add_executable(tethered_drone_node
+  src/tethered_drone_node.cpp
+  src/winch_supervisor.cpp
+)
+
+target_include_directories(tethered_drone_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+
+target_compile_features(tethered_drone_node PUBLIC cxx_std_17)
+
+ament_target_dependencies(tethered_drone_node
+  rclcpp
+  geometry_msgs
+  sensor_msgs)
+
+install(TARGETS tethered_drone_node
+  DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
