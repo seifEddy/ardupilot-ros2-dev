@@ -1,6 +1,8 @@
 [submodule "ardupilot_ws/ardupilot"]
 	path = ardupilot_ws/ardupilot
-	url = https://github.com/ArduPilot/ardupilot.git
+	url = https://github.com/seifEddy/ardupilot.git
+	branch = quad-x-sitl
 [submodule "ardupilot_ws/gz_ws/src/ardupilot_gazebo"]
 	path = ardupilot_ws/gz_ws/src/ardupilot_gazebo
+	branch = quad-x-sitl
 	url = https://github.com/seifEddy/ardupilot_gazebo.git
