@@ -57,6 +57,30 @@ If running MAVROS separately with the telemetry bridge, disable MAVROS's own clo
 ros2 launch robot_description sim_apm_udp.launch.py bridge_clock:=false
 ```
 
+## Run the tether supervisor
+
+In one sourced terminal, launch the tethered Quad X.
+
+```bash
+ros2 launch robot_description copter_sim.launch.py world:=quad_x_tether mode:=gui
+```
+
+In a second sourced terminal, start the supervisor.
+
+```bash
+ros2 run robot_description tethered_drone_node --ros-args -p use_sim_time:=true
+```
+
+Use `ros2 node info /winch_supervisor` from another sourced terminal to inspect the connections. The node starts in monitoring mode. Flight and winch outputs are explicit C++ calls in `WinchSupervisor`. The tension control law is a separate step.
+
+- **Aircraft telemetry** comes from MAVROS `state`, `extended_state`, `estimator_status`, `local_position/odom`, `local_position/velocity_local`, and `global_position/rel_alt`. Odometry provides the local pose and body-frame twist. `velocity_local` provides world-frame velocity for climb and line-direction calculations.
+- **Winch telemetry** comes from `/gz/tether/` and includes length, range, extension, payout rate, tension, azimuth, elevation, drum load torque, and anchor force. Length and payout rate are the drum observables the controller needs. Angles and force use Gazebo world axes. Use the latest received samples and their local receipt times from `tether_telemetry()` and `quad_telemetry()`. The scalar tether messages carry no source timestamp.
+- **Flight commands** use `publish_local_position()` or `publish_local_velocity()`. Both send to `/mavros/setpoint_raw/local` and require a recent connected, armed `GUIDED` state. Supply metres or metres per second in the MAVROS local **ENU** frame. MAVROS converts to MAVLink NED. A controller must periodically resend velocity targets and should be the only source of flight setpoints while it is active. See [ArduCopter Guided commands](https://ardupilot.org/dev/docs/copter-commands-in-guided-mode.html).
+- **Winch commands** use `publish_winch_length()` to send a target in metres to `/gz/tether/cmd_length`. Gazebo applies the configured travel limits.
+- **Flight services** use `request_mode()`, `request_arm()`, `request_takeoff()`, and `request_land()`. Takeoff uses altitude in metres above home and requires armed `GUIDED`. These methods return an optional asynchronous request handle. An empty result means the request was not sent. Check the service response and confirm flight state through telemetry before advancing. Poll futures from a timer without blocking the executor.
+
+The default endpoint prefixes are `/mavros` and `/gz/tether`. Override them with the `mavros_namespace` and `tether_namespace` parameters using absolute names without a trailing slash. Gazebo world and MAVROS local frames have independent origins. A controller combining their positions must align the frames first.
+
 ## Connect MAVROS to a physical flight controller
 
 Run only the MAVROS launch, use wall time, and point `fcu_url` at the controller. Substitute the actual serial device and configured baud rate.

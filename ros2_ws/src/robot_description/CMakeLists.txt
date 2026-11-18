@@ -9,6 +9,8 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp      REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(mavros_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs   REQUIRED)
 
@@ -53,7 +55,9 @@ target_compile_features(tethered_drone_node PUBLIC cxx_std_17)
 ament_target_dependencies(tethered_drone_node
   rclcpp
   geometry_msgs
-  sensor_msgs)
+  mavros_msgs
+  nav_msgs
+  std_msgs)
 
 install(TARGETS tethered_drone_node
   DESTINATION lib/${PROJECT_NAME})
