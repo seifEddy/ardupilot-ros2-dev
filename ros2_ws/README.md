@@ -68,10 +68,11 @@ ros2 launch robot_description copter_sim.launch.py world:=quad_x_tether mode:=gu
 In a second sourced terminal, start the supervisor.
 
 ```bash
-ros2 run robot_description tethered_drone_node --ros-args -p use_sim_time:=true
+ros2 run robot_description tethered_drone_node --ros-args \
+  -p use_sim_time:=true -p target_altitude_z:=15.0
 ```
 
-Use `ros2 node info /winch_supervisor` from another sourced terminal to inspect the connections. The node starts in monitoring mode. Flight and winch outputs are explicit C++ calls in `WinchSupervisor`. The tension control law is a separate step.
+Use `ros2 node info /winch_supervisor` from another sourced terminal to inspect the connections. Starting this node activates the station-relative position-control demo. Its 100 ms wall timer requests GUIDED mode and arming, then requests takeoff before publishing XYZ velocity commands. Run this demo with the tethered SITL stack and give it ownership of the flight setpoints. The Gazebo plugin handles automatic reel take-up and payout. Tension-aware aircraft control is a future step.
 
 - **Aircraft telemetry** comes from MAVROS `state`, `extended_state`, `estimator_status`, `local_position/odom`, `local_position/velocity_local`, and `global_position/rel_alt`. Odometry provides the local pose and body-frame twist. `velocity_local` provides world-frame velocity for climb and line-direction calculations.
 - **Winch telemetry** comes from `/gz/tether/` and includes length, range, extension, payout rate, tension, azimuth, elevation, drum load torque, and anchor force. Length and payout rate are the drum observables the controller needs. Angles and force use Gazebo world axes. Use the latest received samples and their local receipt times from `tether_telemetry()` and `quad_telemetry()`. The scalar tether messages carry no source timestamp.
@@ -80,6 +81,49 @@ Use `ros2 node info /winch_supervisor` from another sourced terminal to inspect 
 - **Flight services** use `request_mode()`, `request_arm()`, `request_takeoff()`, and `request_land()`. Takeoff uses altitude in metres above home and requires armed `GUIDED`. These methods return an optional asynchronous request handle. An empty result means the request was not sent. Check the service response and confirm flight state through telemetry before advancing. Poll futures from a timer without blocking the executor.
 
 The default endpoint prefixes are `/mavros` and `/gz/tether`. Override them with the `mavros_namespace` and `tether_namespace` parameters using absolute names without a trailing slash. Gazebo world and MAVROS local frames have independent origins. A controller combining their positions must align the frames first.
+
+### Position controller and target altitude
+
+The controller reconstructs the aircraft attachment position relative to the station fairlead from endpoint `range`, `azimuth`, and `elevation`. Angles are in radians and the vector uses Gazebo world ENU axes.
+
+```text
+x = range × cos(elevation) × cos(azimuth)
+y = range × cos(elevation) × sin(azimuth)
+z = range × sin(elevation)
+
+vx = 0.25 × (0.0 − x)
+vy = 0.25 × (0.0 − y)
+vz = 0.20 × (target_altitude_z − z)
+```
+
+The target is `(0.0, 0.0, target_altitude_z)` metres relative to the fairlead. The X and Y targets and the proportional gains are hardcoded. ArduPilot's velocity and attitude controllers track the velocity commands in GUIDED mode.
+
+`target_altitude_z` is a double ROS parameter with a default of `15.0` m. The timer reads it on every callback, so it can be changed while the node runs.
+
+```bash
+ros2 param get /winch_supervisor target_altitude_z
+ros2 param set /winch_supervisor target_altitude_z 12.0
+```
+
+Use a finite value greater than 0.5 m. The callback skips control when this condition is unmet. The parameter service can still accept a value that the callback subsequently skips.
+
+The node publishes these `geometry_msgs/msg/Vector3` diagnostics under the configured tether namespace.
+
+- `/gz/tether/relative_position` contains the reconstructed fairlead-to-aircraft attachment vector.
+- `/gz/tether/transformed_quad_position` adds the hardcoded demo station offset `(-1.4, 0.0, 0.0)` m to that vector for comparison with MAVROS local position.
+
+These vectors have no header or timestamp. The demo translation assumes aligned world and MAVROS axes and origins. The fairlead and aircraft attachment offsets also affect comparison with the aircraft body position. Account for those offsets and frame alignment when evaluating the difference against `/mavros/local_position/odom`.
+
+```bash
+ros2 topic echo /gz/tether/relative_position
+ros2 topic echo /gz/tether/transformed_quad_position
+ros2 topic echo /mavros/local_position/odom
+ros2 topic echo /gz/tether/tension
+```
+
+### Current takeoff sequencing
+
+The demo requests a hardcoded takeoff altitude of 10 m above home whenever paid-out cable length is below `target_altitude_z / 3.0`. Above that threshold it runs the proportional controller. The takeoff altitude and the controller's target use different reference points. Increasing the target sufficiently can enter the takeoff branch again during flight. Mode, arming, and takeoff requests are retried by the timer according to telemetry, and the demo does not track their asynchronous responses. The length-based takeoff gate and service sequencing are part of the current prototype.
 
 ## Connect MAVROS to a physical flight controller
 

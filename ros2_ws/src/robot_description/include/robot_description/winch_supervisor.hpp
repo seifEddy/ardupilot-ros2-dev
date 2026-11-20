@@ -72,6 +72,9 @@ class WinchSupervisor : public rclcpp::Node
         PendingRequest<mavros_msgs::srv::CommandBool> request_arm(bool arm);
         PendingRequest<mavros_msgs::srv::CommandTOL> request_takeoff(float relative_altitude_m);
         PendingRequest<mavros_msgs::srv::CommandTOL> request_land();
+        void hover_above_drum_at();
+        // create an rclcpp Timer for periodically controlling the relative position above the drum
+        rclcpp::TimerBase::SharedPtr control_timer_;
 
     private:
         template<typename Message>
@@ -80,10 +83,14 @@ class WinchSupervisor : public rclcpp::Node
 
         QuadTelemetry quad_;
         TetherTelemetry tether_;
+        // For demonstrations purposes
+        geometry_msgs::msg::Vector3 demo_station_position;
 
         std::vector<rclcpp::SubscriptionBase::SharedPtr> subscriptions_;
         rclcpp::Publisher<mavros_msgs::msg::PositionTarget>::SharedPtr local_setpoint_pub_;
         rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr winch_length_pub_;
+        rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr relative_position_pub_;
+        rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr transformed_quad_position_pub_;
 
         rclcpp::Client<mavros_msgs::srv::SetMode>::SharedPtr mode_client_;
         rclcpp::Client<mavros_msgs::srv::CommandBool>::SharedPtr arm_client_;

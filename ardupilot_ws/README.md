@@ -21,7 +21,23 @@ For simulation with MAVROS and the ROS 2 sensor bridge, use [the combined ROS 2 
 
 ## Tethered Quad X
 
-The tether world adds an anchored station, driven drum and compliant line to the Quad X test field. The starting payout is set in the world file. The drum automatically pays out against a brake when the cable pulls above its breakaway threshold. See the [tether model and measurements](gz_ws/src/ardupilot_gazebo/docs/quad_x_tether.md) for the joint layout, force law, and winch commands.
+The tether world adds an anchored station, driven drum and compliant line to the Quad X test field. The initial payout is 3.0 m. Above that length, automatic take-up applies a gentle winding torque to recover slack. The aircraft can pull cable out when tension overcomes the take-up torque and brake resistance. Explicit length commands temporarily take control of the reel.
+
+The current world uses `takeup_tension=0.25` N, `brake_damping=0.00098` N·m·s/rad, and 2.0 m/s retraction and payout speed limits. Cable stiffness is 10.0 N/m, axial damping is 1.0 N·s/m, and the cable force saturates at 15.0 N. Speed limits cap motion, while torque, damping, cable load, and drum inertia determine the actual response. See the [tether model and measurements](gz_ws/src/ardupilot_gazebo/docs/quad_x_tether.md) for the joint layout, force law, tuning calculations, and winch commands.
+
+The [ROS 2 tether supervisor](../ros2_ws/README.md#run-the-tether-supervisor) adds station-relative XYZ proportional control through MAVROS velocity targets. Its target altitude is adjustable at runtime with `target_altitude_z` and its X and Y targets are zero.
+
+### Rebuild the tether plugin
+
+After editing the plugin C++ source, build the shared library from the repository checkout.
+
+```bash
+cd ~/ardupilot-ros2-dev/ardupilot_ws/gz_ws/src/ardupilot_gazebo
+GZ_VERSION=harmonic CCACHE_DISABLE=1 cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+CCACHE_DISABLE=1 cmake --build build --target TetherPlugin -j4
+```
+
+Restart Gazebo to load the rebuilt library. Changes to the world SDF also take effect after restarting Gazebo. The launcher builds missing plugin libraries on startup. Rebuild explicitly after source changes to refresh an existing library.
 
 ## Circle flight demo
 

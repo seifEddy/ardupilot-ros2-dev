@@ -35,9 +35,11 @@ Omit `mode:=gui` for headless rendering. See the [ArduPilot workspace guide](ard
 
 ## Tethered Quad X
 
-The tethered world adds an anchored ground station with a rotating winch drum. The cable goes slack when the aircraft is within the paid-out length and pulls toward the fairlead when stretched. Above the configured breakaway tension, the aircraft can pull cable off the drum against a damped brake. The winch limits payout speed and travel, and accepts manual length commands on `/gz/tether/cmd_length`.
+The tethered world adds an anchored ground station with a rotating winch drum. The cable goes slack when the aircraft is within the paid-out length and pulls toward the fairlead when stretched. Automatic take-up winds excess cable back in above the initial 3.0 m, using a configurable winding force and retraction speed limit. When tension overcomes the take-up torque and brake resistance, the aircraft can pull cable off the drum. The winch limits payout speed and travel, and accepts manual length commands on `/gz/tether/cmd_length`.
 
-The ROS 2 bridge publishes paid-out length, endpoint range, extension, payout rate, tension, fairlead force, azimuth, elevation, and drum load torque under `/gz/tether/`. Use `ros2 topic list` to discover the topics, or plot them in PlotJuggler. See the [tether implementation and theory (PDF)](docs/quad-x-tether-implementation.pdf) for the station joints, equations, tuning examples, and references.
+The ROS 2 bridge publishes paid-out length, endpoint range, extension, payout rate, tension, fairlead force, azimuth, elevation, and drum load torque under `/gz/tether/`. Use `ros2 topic list` to discover the topics, or plot them in PlotJuggler. See the [tether model guide](ardupilot_ws/gz_ws/src/ardupilot_gazebo/docs/quad_x_tether.md) for current take-up settings and measurements. The [tether implementation and theory (PDF)](docs/quad-x-tether-implementation.pdf) describes the original braked-winch model, station joints, equations, and references.
+
+The [ROS 2 tether supervisor](ros2_ws/README.md#run-the-tether-supervisor) reconstructs relative XYZ position from endpoint range, azimuth, and elevation, then commands proportional XYZ velocity in GUIDED mode. X and Y targets are zero. The `target_altitude_z` ROS parameter sets the desired relative altitude and can be updated while the node runs. The demo requests arming and takeoff when started, and publishes relative and translated position diagnostics for comparison with MAVROS telemetry.
 
 ### Gazebo views and flight telemetry
 
