@@ -11,7 +11,7 @@ case "${1:-headless}" in
     gui) gazebo_args=() ;;
     headless) gazebo_args=(-s --headless-rendering) ;;
     *)
-        printf 'Usage: %s [gui|headless] [quad_x|quad_x_tether|iris]\n' "$0" >&2
+        printf 'Usage: %s [gui|headless] [quad_x|quad_x_tether|quad_x_tether_car|iris]\n' "$0" >&2
         exit 2
         ;;
 esac
@@ -19,9 +19,10 @@ esac
 case "${2:-quad_x}" in
     quad_x) world=quad_x.sdf ;;
     quad_x_tether) world=quad_x_tether.sdf ;;
+    quad_x_tether_car) world=quad_x_tether_car.sdf ;;
     iris) world=iris_runway.sdf ;;
     *)
-        printf 'Usage: %s [gui|headless] [quad_x|quad_x_tether|iris]\n' "$0" >&2
+        printf 'Usage: %s [gui|headless] [quad_x|quad_x_tether|quad_x_tether_car|iris]\n' "$0" >&2
         exit 2
         ;;
 esac
@@ -40,7 +41,7 @@ fi
 
 # Second, we check if the user has built the ArduPilot Gazebo plugin. If not, we will build it.
 if [ ! -f "${GAZEBO_DIR}/build/libArduPilotPlugin.so" ] ||
-   { [ "${world}" = quad_x_tether.sdf ] && [ ! -f "${GAZEBO_DIR}/build/libTetherPlugin.so" ]; }; then
+   { [[ "${world}" == quad_x_tether*.sdf ]] && [ ! -f "${GAZEBO_DIR}/build/libTetherPlugin.so" ]; }; then
     echo -e "\033[1;32mArduPilot Gazebo plugin not found. Building it now...\033[0m" 
     cd "${GAZEBO_DIR}"
     mkdir -p build

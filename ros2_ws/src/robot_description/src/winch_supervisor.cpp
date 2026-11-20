@@ -55,8 +55,6 @@ WinchSupervisor::WinchSupervisor() : Node("winch_supervisor")
         tether + "/cmd_length", 1);
     relative_position_pub_ = this->create_publisher<geometry_msgs::msg::Vector3>(
         tether + "/relative_position", 1);
-    transformed_quad_position_pub_ = this->create_publisher<geometry_msgs::msg::Vector3>(
-        tether + "/transformed_quad_position", 1);
 
     mode_client_ = this->create_client<mavros_msgs::srv::SetMode>(mavros + "/set_mode");
     arm_client_ = this->create_client<mavros_msgs::srv::CommandBool>(mavros + "/cmd/arming");
@@ -262,16 +260,11 @@ void WinchSupervisor::hover_above_drum_at()
     relative_position.y = range * std::cos(elevation) * std::sin(azimuth);
     relative_position.z = range * std::sin(elevation);
     relative_position_pub_->publish(relative_position);
-    auto transformed_quad_position = geometry_msgs::msg::Vector3();
-    transformed_quad_position.x = relative_position.x + this->demo_station_position.x;
-    transformed_quad_position.y = relative_position.y + this->demo_station_position.y;
-    transformed_quad_position.z = relative_position.z + this->demo_station_position.z;
-    transformed_quad_position_pub_->publish(transformed_quad_position);
     double x_error = -relative_position.x;
     double y_error = -relative_position.y;
     double z_error = relative_altitude_m - relative_position.z;
     // Apply a simple proportional gain for altitude control
-    const double Kp_z = 0.2, Kp_xy = 0.25;
+    const double Kp_z = 1.2, Kp_xy = 0.8;
     velocity_pid_control.x = x_error * Kp_xy;
     velocity_pid_control.y = y_error * Kp_xy;
     velocity_pid_control.z = z_error * Kp_z;

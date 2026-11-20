@@ -23,7 +23,7 @@ If building the differential-drive example, also install its controller dependen
 ros2 launch robot_description copter_sim.launch.py mode:=gui
 ```
 
-The default is `mode:=headless world:=quad_x`. Set `world:=quad_x_tether` for the tether station or `world:=iris` for the original Iris runway. If the ROS install is outside the checkout, pass `sitl_script:=/absolute/path/to/ardupilot_ws/start_copter_sim.sh`. Run a single stack per SITL endpoint.
+The default is `mode:=headless world:=quad_x`. Set `world:=quad_x_tether` for the fixed tether station, `world:=quad_x_tether_car` for the mobile Prius station, or `world:=iris` for the original Iris runway. If the ROS install is outside the checkout, pass `sitl_script:=/absolute/path/to/ardupilot_ws/start_copter_sim.sh`. Run a single stack per SITL endpoint.
 
 The launcher starts the existing shell script as a managed process and includes both ROS launch files. The Gazebo bridge publishes the world clock once on ROS `/clock`. MAVROS and its telemetry requester use simulation time. The requester waits for a connected FCU and retries stream requests using the ROS clock. It reapplies them after a reconnect and waits for the clock when Gazebo is paused or reset.
 
@@ -91,9 +91,9 @@ x = range × cos(elevation) × cos(azimuth)
 y = range × cos(elevation) × sin(azimuth)
 z = range × sin(elevation)
 
-vx = 0.25 × (0.0 − x)
-vy = 0.25 × (0.0 − y)
-vz = 0.20 × (target_altitude_z − z)
+vx = 0.80 × (0.0 − x)
+vy = 0.80 × (0.0 − y)
+vz = 1.20 × (target_altitude_z − z)
 ```
 
 The target is `(0.0, 0.0, target_altitude_z)` metres relative to the fairlead. The X and Y targets and the proportional gains are hardcoded. ArduPilot's velocity and attitude controllers track the velocity commands in GUIDED mode.
@@ -102,21 +102,15 @@ The target is `(0.0, 0.0, target_altitude_z)` metres relative to the fairlead. T
 
 ```bash
 ros2 param get /winch_supervisor target_altitude_z
-ros2 param set /winch_supervisor target_altitude_z 12.0
+ros2 param set /winch_supervisor target_altitude_z 6.0
 ```
 
 Use a finite value greater than 0.5 m. The callback skips control when this condition is unmet. The parameter service can still accept a value that the callback subsequently skips.
 
-The node publishes these `geometry_msgs/msg/Vector3` diagnostics under the configured tether namespace.
-
-- `/gz/tether/relative_position` contains the reconstructed fairlead-to-aircraft attachment vector.
-- `/gz/tether/transformed_quad_position` adds the hardcoded demo station offset `(-1.4, 0.0, 0.0)` m to that vector for comparison with MAVROS local position.
-
-These vectors have no header or timestamp. The demo translation assumes aligned world and MAVROS axes and origins. The fairlead and aircraft attachment offsets also affect comparison with the aircraft body position. Account for those offsets and frame alignment when evaluating the difference against `/mavros/local_position/odom`.
+The node publishes the reconstructed fairlead-to-aircraft attachment vector on `/gz/tether/relative_position` as `geometry_msgs/msg/Vector3`. This message has no header or timestamp. Its components use world ENU axes and its origin follows the fairlead. For comparison with MAVROS aircraft body position, align the world and local frames and account for the fairlead and aircraft attachment offsets.
 
 ```bash
 ros2 topic echo /gz/tether/relative_position
-ros2 topic echo /gz/tether/transformed_quad_position
 ros2 topic echo /mavros/local_position/odom
 ros2 topic echo /gz/tether/tension
 ```
@@ -124,6 +118,93 @@ ros2 topic echo /gz/tether/tension
 ### Current takeoff sequencing
 
 The demo requests a hardcoded takeoff altitude of 10 m above home whenever paid-out cable length is below `target_altitude_z / 3.0`. Above that threshold it runs the proportional controller. The takeoff altitude and the controller's target use different reference points. Increasing the target sufficiently can enter the takeoff branch again during flight. Mode, arming, and takeoff requests are retried by the timer according to telemetry, and the demo does not track their asynchronous responses. The length-based takeoff gate and service sequencing are part of the current prototype.
+
+## MAVROS package and namespace troubleshooting
+
+Keep `mavros`, `mavros-extras`, `mavros-msgs`, and `libmavconn` on compatible package versions after installing or restoring ROS packages. A mixed installation can make `mavros_node` exit with a missing message-type-support symbol. Update the related packages together and rebuild `robot_description` against the installed messages.
+
+```bash
+sudo apt install ros-humble-mavros ros-humble-mavros-extras \
+  ros-humble-mavros-msgs ros-humble-libmavconn ros-humble-mavlink
+```
+
+The launch explicitly places MAVROS under `<namespace>/mavros`. With the default empty prefix, state is `/mavros/state` and command services include `/mavros/set_mode` and `/mavros/cmd/arming`. With MAVROS 2.17, giving the process an empty launch namespace can place plugin interfaces at `/state`, `/set_mode`, and `/cmd/arming`. The supervisor and stream requester expect the `/mavros` interfaces.
+
+```bash
+ros2 topic info /mavros/state
+ros2 topic echo /mavros/state --once
+ros2 service list | grep -E 'mavros/(set_mode|cmd/arming)'
+```
+
+A state-topic publisher confirms that the ROS interface is present. Its `connected` field confirms the MAVLink heartbeat connection. The supervisor also requires tether length and anchor-force messages before attempting mode or arming requests. Arming can still be rejected while the estimator and sensors initialize. Read `/mavros/statustext/recv` for the FCU reason. During the isolated startup check, `Arm: Accels inconsistent` cleared after settling and a subsequent request succeeded.
+
+## Mobile winch car
+
+The `quad_x_tether_car` world adds a simplified Prius with a roof-mounted winch and the tethered Quad X. The car retains the source body and wheel visuals, with a single body collision, rigid rear-wheel mounts, and front steering. The station base is attached to the car chassis by `station_mount_joint`, a fixed joint. The drum remains free to rotate about `drum_joint`. The fairlead is at `(0, 0, 1.82)` m in the car frame, and the tether plugin evaluates the moving anchor's pose and velocity every physics step.
+
+The bridge accepts `geometry_msgs/msg/Twist` on `/car/cmd_vel` and publishes `nav_msgs/msg/Odometry` on `/car/odom` and `/car/ground_truth`, plus `sensor_msgs/msg/JointState` on `/car/joint_states`. Odometry uses a local `car/odom` frame. Ground truth uses `world` and includes the car spawn offset. Existing drone and tether topics are available in the same profile. To bridge a separately started mobile world, use `gazebo_bridge.launch.py world:=quad_x_tether_car`.
+
+### Keyboard teleoperation
+
+Run the installed ROS node from a sourced interactive terminal.
+
+```bash
+ros2 run robot_description car_teleop.py
+```
+
+Use W/S for forward/reverse, A/D for forward turns, Z/C for reverse turns, Space to stop, and Q or Ctrl+C to exit. The node sends commands at approximately 20 Hz, restores terminal settings on exit, and sends zero commands after 0.6 s without a key. Terminal key repeat determines how a held key is received. Startup parameters are `speed` (0.5 m/s), `turn_rate` (0.2 rad/s), and `key_timeout` (0.6 s).
+
+```bash
+ros2 run robot_description car_teleop.py --ros-args \
+  -p speed:=0.25 -p turn_rate:=0.05 -p key_timeout:=0.6
+```
+
+Ackermann steering requires translational motion to turn. The car plugin caps speed at ±2 m/s and acceleration at ±1 m/s², so a zero command causes deceleration according to that limit. The key timeout runs inside the keyboard node. The car plugin retains its last command if that node terminates without sending a stop.
+
+If your ROS CLI lacks the `run` extension, install `ros-humble-ros2run` or execute the ROS node directly after sourcing the workspace.
+
+```bash
+python3 ~/ardupilot-ros2-dev/ros2_ws/src/robot_description/scripts/car_teleop.py
+```
+
+### Run the 15 m to 6 m altitude demo
+
+Build the package and source ROS plus the overlay in each terminal. Install PlotJuggler's ROS plugins if needed to visualize the states.
+
+```bash
+source /opt/ros/humble/setup.bash
+cd ~/ardupilot-ros2-dev/ros2_ws
+colcon build --packages-select robot_description
+source install/setup.bash
+```
+
+In the first terminal, start Gazebo, SITL, MAVROS, and the bridge.
+
+```bash
+ros2 launch robot_description copter_sim.launch.py world:=quad_x_tether_car mode:=gui
+```
+
+In the second terminal, start the aircraft controller. Starting it activates its GUIDED, arming, and takeoff requests. Omitting `target_altitude_z` uses the default 15.0 m target above the moving fairlead. X and Y targets are zero.
+
+```bash
+ros2 run robot_description tethered_drone_node --ros-args -p use_sim_time:=true
+```
+
+In the third terminal, start `car_teleop.py` as shown above.
+
+After the aircraft approaches 15 m relative altitude, change the live target from another sourced terminal.
+
+```bash
+ros2 param set /winch_supervisor target_altitude_z 6.0
+ros2 param get /winch_supervisor target_altitude_z
+```
+The target is a ROS parameter. The current node publishes measured position. Drive the car from the keyboard terminal to observe the relative X/Y tracking response.
+
+The [mobile demo GIF](../README.md#mobile-car-tracking-and-altitude-step) shows this workflow. The [mobile tether guide](../ardupilot_ws/gz_ws/src/ardupilot_gazebo/docs/quad_x_tether_car.md) describes the copied model, roof joint, topics, and moving-anchor dynamics.
+
+### Current controller assumptions (Needs some LOVE)
+
+The proportional gains are hardcoded at `Kp_xy=0.8` and `Kp_z=1.2` s⁻¹. A moving car can produce tracking lag because the controller uses relative-position feedback without car-velocity feed-forward. The controller currently has no explicit velocity-command saturation. Its target altitude is relative to the fairlead, and its takeoff service requests 10 m above home through the length-based gate described above. Tether sample availability and finite range/angle checks are implemented, while tether sample-age rejection and service-response sequencing are further development steps.
 
 ## Connect MAVROS to a physical flight controller
 

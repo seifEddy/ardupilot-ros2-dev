@@ -90,7 +90,6 @@ class WinchSupervisor : public rclcpp::Node
         rclcpp::Publisher<mavros_msgs::msg::PositionTarget>::SharedPtr local_setpoint_pub_;
         rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr winch_length_pub_;
         rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr relative_position_pub_;
-        rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr transformed_quad_position_pub_;
 
         rclcpp::Client<mavros_msgs::srv::SetMode>::SharedPtr mode_client_;
         rclcpp::Client<mavros_msgs::srv::CommandBool>::SharedPtr arm_client_;

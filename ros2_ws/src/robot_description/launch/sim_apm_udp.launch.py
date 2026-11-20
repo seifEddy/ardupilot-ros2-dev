@@ -10,7 +10,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterFile, ParameterValue
 
@@ -47,12 +47,12 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("bridge_clock")),
         output="screen",
     )
-    # Same APM configuration as stock apm.launch. Do not set a global node
-    # name: mavros_node creates several internal nodes and plugin nodes.
+    # Explicitly anchor plugin interfaces under <namespace>/mavros.
+    # MAVROS 2.17 applies an empty launch namespace to plugin nodes as root.
     mavros = Node(
         package="mavros",
         executable="mavros_node",
-        namespace=LaunchConfiguration("namespace"),
+        namespace=PathJoinSubstitution([LaunchConfiguration("namespace"), "mavros"]),
         parameters=[
             str(mavros_share / "launch" / "apm_pluginlists.yaml"),
             str(mavros_share / "launch" / "apm_config.yaml"),

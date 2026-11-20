@@ -8,6 +8,7 @@ From the repository root, run:
 ./ardupilot_ws/start_copter_sim.sh                # Quad X with headless rendering
 ./ardupilot_ws/start_copter_sim.sh gui            # Quad X with the Gazebo GUI
 ./ardupilot_ws/start_copter_sim.sh gui quad_x_tether # Quad X with the ground winch
+./ardupilot_ws/start_copter_sim.sh gui quad_x_tether_car # Quad X with a Prius-mounted winch
 ./ardupilot_ws/start_copter_sim.sh gui iris       # Original Iris runway
 ```
 
@@ -38,6 +39,16 @@ CCACHE_DISABLE=1 cmake --build build --target TetherPlugin -j4
 ```
 
 Restart Gazebo to load the rebuilt library. Changes to the world SDF also take effect after restarting Gazebo. The launcher builds missing plugin libraries on startup. Rebuild explicitly after source changes to refresh an existing library.
+
+## Mobile Prius tether station
+
+`quad_x_tether_car` uses a simplified local copy of the Prius from the Open Robotics Sonoma example. Its front wheels steer, rear wheels drive, and the winch base is fixed to the roof. The existing drum and cable plugin handle moving-anchor forces. ROS keyboard commands and car odometry are available through the mobile bridge profile.
+
+`station_mount_joint` fixes the station base to the chassis, replacing the ground anchor in this mobile model. The independent `drum_joint` retains its payout and retraction dynamics. The station base is 1.5 m above the car origin, and its fairlead attachment is at `(0, 0, 1.82)` m in the car frame. The plugin calculates cable extension rate using velocities at both moving attachment points.
+
+The ROS keyboard node publishes `/car/cmd_vel` and the bridge exposes car odometry, 3D ground truth, and joint states. `car_teleop.py` uses W/S for forward/reverse, A/D for forward turns, Z/C for reverse turns, and Space to stop. It commands zero after its key timeout and on normal exit.
+
+See the [mobile tether guide](gz_ws/src/ardupilot_gazebo/docs/quad_x_tether_car.md) for model sources, mounting geometry, controls, and topics. The [ROS demo workflow](../ros2_ws/README.md#run-the-15-m-to-6-m-altitude-demo) starts the complete stack with keyboard control and PlotJuggler, then changes `target_altitude_z` from its 15 m default to 6 m. The [mobile demo GIF](../README.md#mobile-car-tracking-and-altitude-step) shows the Gazebo view and relative-position plots.
 
 ## Circle flight demo
 

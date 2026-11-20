@@ -1,6 +1,6 @@
 # ArduPilot ROS 2 development workspace
 
-Develop and test ArduCopter with SITL, Gazebo Harmonic, ROS 2 Humble, and MAVROS. Choose the Iris runway, the free-flight Quad X test field, or the tethered Quad X test field. MAVROS connects to SITL over MAVLink and also supports a standalone connection to a physical flight controller. Gazebo sensor and simulation topics reach ROS 2 through `ros_gz_bridge`.
+Develop and test ArduCopter with SITL, Gazebo Harmonic, ROS 2 Humble, and MAVROS. Choose the Iris runway, the free-flight Quad X test field, the tethered Quad X test field, or the mobile Prius tether station. MAVROS connects to SITL over MAVLink and also supports a standalone connection to a physical flight controller. Gazebo sensor and simulation topics reach ROS 2 through `ros_gz_bridge`.
 
 ## Quick start
 
@@ -25,6 +25,14 @@ Follow the [ROS 2 workspace setup](ros2_ws/README.md#build) to build and source 
   ros2 launch robot_description copter_sim.launch.py world:=quad_x_tether mode:=gui
   ```
 
+- **Mobile tethered Quad X** loads a simplified Prius with a roof-mounted winch and the tethered aircraft.
+
+  ```bash
+  ros2 launch robot_description copter_sim.launch.py world:=quad_x_tether_car mode:=gui
+  ```
+
+  Drive it from another sourced terminal with `ros2 run robot_description car_teleop.py`. See the [mobile station guide](ardupilot_ws/gz_ws/src/ardupilot_gazebo/docs/quad_x_tether_car.md) for controls and state topics.
+
 - **Free-flight Quad X** launches the same aircraft in the test field without the tether. This is the default world if you omit `world`.
 
   ```bash
@@ -39,7 +47,19 @@ The tethered world adds an anchored ground station with a rotating winch drum. T
 
 The ROS 2 bridge publishes paid-out length, endpoint range, extension, payout rate, tension, fairlead force, azimuth, elevation, and drum load torque under `/gz/tether/`. Use `ros2 topic list` to discover the topics, or plot them in PlotJuggler. See the [tether model guide](ardupilot_ws/gz_ws/src/ardupilot_gazebo/docs/quad_x_tether.md) for current take-up settings and measurements. The [tether implementation and theory (PDF)](docs/quad-x-tether-implementation.pdf) describes the original braked-winch model, station joints, equations, and references.
 
-The [ROS 2 tether supervisor](ros2_ws/README.md#run-the-tether-supervisor) reconstructs relative XYZ position from endpoint range, azimuth, and elevation, then commands proportional XYZ velocity in GUIDED mode. X and Y targets are zero. The `target_altitude_z` ROS parameter sets the desired relative altitude and can be updated while the node runs. The demo requests arming and takeoff when started, and publishes relative and translated position diagnostics for comparison with MAVROS telemetry.
+The [ROS 2 tether supervisor](ros2_ws/README.md#run-the-tether-supervisor) reconstructs relative XYZ position from endpoint range, azimuth, and elevation, then commands proportional XYZ velocity in GUIDED mode. X and Y targets are zero. The `target_altitude_z` ROS parameter sets the desired relative altitude and can be updated while the node runs. The demo requests arming and takeoff when started, and publishes the fairlead-relative XYZ vector on `/gz/tether/relative_position`.
+
+### Mobile car tracking and altitude step
+
+The mobile world uses a simplified Prius with rear-wheel drive, front-wheel steering, and a winch base fixed to the roof. The rotating drum and compliant tether transfer load between the car and Quad X. Drive the car with the `car_teleop.py` ROS node, while the aircraft controller regulates its relative X/Y position to zero and Z to the `target_altitude_z` parameter.
+
+The demo starts at the default 15 m relative-altitude target and changes it live to 6 m, to 3 m and finally to 10 m. Follow the [complete launch and plotting workflow](ros2_ws/README.md#run-the-15-m-to-6-m-altitude-demo).
+
+```bash
+ros2 param set /winch_supervisor target_altitude_z 6.0
+```
+
+![Prius-mounted winch and tethered Quad X during a 15 m to 6 m 3 m and then 10 m target change](docs/videos/quad-x-tethered-sim-car.gif)
 
 ### Gazebo views and flight telemetry
 
